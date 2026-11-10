@@ -37,8 +37,39 @@ pip install gradio
 python app.py
 ```
 
-Then open http://127.0.0.1:7860. Two tabs: try a task, and run the
-golden scenarios.
+Then open http://127.0.0.1:7860. Three tabs: try a task, run the
+golden scenarios, and ask in plain language (v2).
+
+## v2: the LLM brain
+
+v2 adds a brain that picks the task from plain language. A small local
+model, Qwen2.5-0.5B-Instruct, reads the request and replies with one
+JSON task. The executor and its guardrails do not change. The brain
+proposes, the guardrails decide what runs.
+
+Setup, once:
+
+```bash
+pip install torch transformers
+```
+
+The first run downloads the model, about 1 GB. Then:
+
+```bash
+python -m agentopsworkbench.cli --brain llm --request "Change Asha Verma's email to asha.new@example.com"
+```
+
+Or use the third tab in the UI, "Ask in plain language". The model
+loads on first use and is reused after that.
+
+Measured on 8 plain-language requests
+(`scripts/run_golden_llm.py`): 7 of 8 passed, with 1 unauthorized
+mutation, from the one failure. The failure is honest and worth knowing: asked
+about a person who is not a customer, the model guesses a customer
+instead of declining. The plan looks valid, so the executor cannot
+catch it. The backstop is the human approval step, which shows the
+proposed plan before anything runs. The golden runner auto-approves,
+so it does not get that protection.
 
 ## Proof: the golden set
 

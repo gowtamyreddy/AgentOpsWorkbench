@@ -16,6 +16,7 @@ from pathlib import Path
 import gradio as gr
 
 from agentopsworkbench.approval import always_approve, always_deny
+from agentopsworkbench.brain import LLMBrain
 from agentopsworkbench.executor import run_plan
 from agentopsworkbench.policy import TASKS, build_plan
 from agentopsworkbench.store import SEED, CustomerStore
@@ -69,6 +70,34 @@ def run_golden():
     return out
 
 
+_llm_brain = None
+
+
+def run_request(request, approve):
+    """Plain-language request through the LLM brain (v2)."""
+    global _llm_brain
+    if not request.strip():
+        return "needs input", "", "", ""
+    if _llm_brain is None:
+        _llm_brain = LLMBrain()
+    proposal = _llm_brain.plan(request)
+    plan_text = json.dumps(
+        {"task": proposal.task, **proposal.inputs}, indent=2
+    ) if proposal.ok else f"no plan: {proposal.error}"
+    if not proposal.ok:
+        return "refused", plan_text, "", ""
+    steps, allow_list, verify_spec = build_plan(
+        proposal.task, proposal.inputs
+    )
+    store = CustomerStore()
+    approver = always_approve if approve else always_deny
+    result = run_plan(steps, allow_list, store, approver,
+                      verify_spec=verify_spec)
+    record = result.store_snapshot.get(proposal.inputs["customer_id"])
+    return (result.status, plan_text, format_trace(result),
+            json.dumps(record, indent=2))
+
+
 with gr.Blocks(title="AgentOps Workbench") as demo:
     gr.Markdown("# AgentOps Workbench: test UI")
     gr.Markdown(
@@ -118,6 +147,32 @@ with gr.Blocks(title="AgentOps Workbench") as demo:
         golden_btn = gr.Button("Run all 10 scenarios", variant="primary")
         golden_out = gr.Textbox(label="Results", lines=14)
         golden_btn.click(run_golden, outputs=golden_out)
+
+    with gr.Tab("Ask in plain language (v2)"):
+        gr.Markdown(
+            "A small local model (Qwen2.5-0.5B-Instruct) picks the task. "
+            "The same guardrails run the plan. First run downloads the "
+            "model (about 1 GB) and takes a while; later runs reuse it."
+        )
+        request = gr.Textbox(
+            label="Request",
+            value="Change Asha Verma's email to asha.new@example.com",
+        )
+        approve_llm = gr.Checkbox(
+            label="Human approval: approve this update",
+            value=True,
+        )
+        ask_btn = gr.Button("Run request", variant="primary")
+        status_llm = gr.Textbox(label="Run status")
+        plan_llm = gr.Textbox(label="Plan the model proposed", lines=5)
+        trace_llm = gr.Textbox(label="Trace log", lines=10)
+        record_llm = gr.Textbox(label="Customer record after the run",
+                                lines=8)
+        ask_btn.click(
+            run_request,
+            inputs=[request, approve_llm],
+            outputs=[status_llm, plan_llm, trace_llm, record_llm],
+        )
 
 
 if __name__ == "__main__":
