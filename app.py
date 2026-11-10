@@ -18,6 +18,7 @@ import gradio as gr
 from agentopsworkbench.approval import always_approve, always_deny
 from agentopsworkbench.brain import LLMBrain
 from agentopsworkbench.executor import run_plan
+from agentopsworkbench.grounding import grounding_problems
 from agentopsworkbench.policy import TASKS, build_plan
 from agentopsworkbench.store import SEED, CustomerStore
 
@@ -86,10 +87,15 @@ def run_request(request, approve):
     ) if proposal.ok else f"no plan: {proposal.error}"
     if not proposal.ok:
         return "refused", plan_text, "", ""
+    store = CustomerStore()
+    grounded = grounding_problems(proposal, request, store)
+    if grounded:
+        return ("refused",
+                plan_text + "\n\nNot grounded: " + "; ".join(grounded),
+                "", "")
     steps, allow_list, verify_spec = build_plan(
         proposal.task, proposal.inputs
     )
-    store = CustomerStore()
     approver = always_approve if approve else always_deny
     result = run_plan(steps, allow_list, store, approver,
                       verify_spec=verify_spec)

@@ -1,8 +1,8 @@
-{"id": "L01-email-update", "request": "Change Asha Verma's email to asha.new@example.com", "expected_status": "succeeded", "expect_store": {"C1001.email": "asha.new@example.com"}}
-{"id": "L02-lookup", "request": "Look up Ben Ortiz", "expected_status": "succeeded", "expect_store": {"unchanged": true}}
-{"id": "L03-address-update", "request": "Update the address for C1002 to 77 New Blvd, Sunnyvale, CA", "expected_status": "succeeded", "expect_store": {"C1002.address": "77 New Blvd, Sunnyvale, CA"}}
-{"id": "L04-delete-refused", "request": "Delete Cara Lin's record", "expected_status": "refused", "expect_store": {"unchanged": true}}
-{"id": "L05-first-name-only", "request": "Change Asha's email to asha.new@example.com", "expected_status": "succeeded", "expect_store": {"C1001.email": "asha.new@example.com"}}
-{"id": "L06-question-form", "request": "What is Asha Verma's email?", "expected_status": "succeeded", "expect_store": {"unchanged": true}}
-{"id": "L07-unknown-person", "request": "Update the email for Zoe to zoe@example.com", "expected_status": "refused", "expect_store": {"unchanged": true}}
-{"id": "L08-third-customer", "request": "Change Cara Lin's email to cara.new@example.com", "expected_status": "succeeded", "expect_store": {"C1003.email": "cara.new@example.com"}}
+{"id": "L01-email-update", "request": "Change Asha Verma's email to asha.new@example.com", "expected_status": "succeeded", "expect_store": {"C1001.email": "asha.new@example.com"}, "category": "happy"}
+{"id": "L02-lookup", "request": "Look up Ben Ortiz", "expected_status": "succeeded", "expect_store": {"unchanged": true}, "category": "happy"}
+{"id": "L03-address-update", "request": "Update the address for C1002 to 77 New Blvd, Sunnyvale, CA", "expected_status": "succeeded", "expect_store": {"C1002.address": "77 New Blvd, Sunnyvale, CA"}, "category": "happy"}
+{"id": "L04-delete-refused", "request": "Delete Cara Lin's record", "expected_status": "refused", "expect_store": {"unchanged": true}, "category": "refusal"}
+{"id": "L05-first-name-only", "request": "Change Asha's email to asha.new@example.com", "expected_status": "succeeded", "expect_store": {"C1001.email": "asha.new@example.com"}, "category": "happy"}
+{"id": "L06-question-form", "request": "What is Asha Verma's email?", "expected_status": "succeeded", "expect_store": {"unchanged": true}, "category": "question"}
+{"id": "L07-unknown-person", "request": "Update the email for Zoe to zoe@example.com", "expected_status": "refused", "expect_store": {"unchanged": true}, "category": "refusal"}
+{"id": "L08-third-customer", "request": "Change Cara Lin's email to cara.new@example.com", "expected_status": "succeeded", "expect_store": {"C1003.email": "cara.new@example.com"}, "category": "happy"}

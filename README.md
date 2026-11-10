@@ -71,6 +71,32 @@ catch it. The backstop is the human approval step, which shows the
 proposed plan before anything runs. The golden runner auto-approves,
 so it does not get that protection.
 
+Stress test, 2026-11-10 (`scripts/run_golden_llm.py --file
+data/stress_requests.jsonl`, 18 requests, run twice, same result):
+13 of 18 passed, 4 unauthorized mutations. The five failures are all
+the same pattern: the model invents a customer or a value the request
+never supplied, a similar name (Asha Sharma for Asha Verma), a vague
+request, gibberish, or "Show me Cara Lin", which it turned into an
+email update with a value copied from the prompt example. Full
+write-up: `docs/stress_test_2026-11-10.md`.
+
+## The grounding check (v2.1)
+
+A deterministic check on every plan the brain proposes, before it
+runs and before approval is asked. The customer the plan names and
+any new value it writes must appear in the request text. A different
+last name attached to the first name, "Asha Sharma" for Asha Verma,
+refuses too. Anything the request never supplied is a guess, and a
+guess is refused, never executed. It lives in
+`agentopsworkbench/grounding.py`, with 10 unit tests, and it runs in
+the CLI, the golden runner, and the UI tab.
+
+Measured after the check, plus one prompt example teaching "Show me
+<name>" as a lookup: v2 golden 8 of 8, stress 18 of 18, zero
+unauthorized mutations in both. The check refused all five stress
+failures; the prompt example fixed the model on "Show me Cara Lin",
+which now maps to a lookup instead of being refused.
+
 ## Proof: the golden set
 
 10 scenarios in `data/golden_scenarios.jsonl`, run with:

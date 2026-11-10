@@ -18,6 +18,7 @@ import json
 from .approval import always_approve, console_approver
 from .brain import LLMBrain, RuleBrain
 from .executor import run_plan
+from .grounding import grounding_problems
 from .policy import TASKS, build_plan
 from .store import CustomerStore
 
@@ -44,6 +45,10 @@ def main(argv=None):
         print(f"Brain proposed: {proposal.raw[:300]}")
         if not proposal.ok:
             print(f"Refused: {proposal.error}")
+            return 1
+        grounded = grounding_problems(proposal, args.request, store)
+        if grounded:
+            print(f"Refused (not grounded): {'; '.join(grounded)}")
             return 1
         steps, allow_list, verify_spec = build_plan(
             proposal.task, proposal.inputs
