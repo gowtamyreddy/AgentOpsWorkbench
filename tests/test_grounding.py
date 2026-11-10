@@ -97,3 +97,43 @@ def test_declined_proposal_has_no_grounding_problems():
     declined = PlanProposal(task=None, inputs={}, ok=False,
                             error="brain declined")
     assert grounding_problems(declined, "Delete Ben Ortiz", store) == []
+
+
+def test_value_belonging_to_another_customer_not_grounded():
+    store = CustomerStore()
+    problems = grounding_problems(
+        _proposal("update_customer_email", customer_id="C1001",
+                  new_email="ben@example.com"),
+        "Change Asha Verma's email to ben@example.com", store)
+    assert any("Ben Ortiz" in p for p in problems)
+
+
+def test_address_belonging_to_another_customer_not_grounded():
+    store = CustomerStore()
+    problems = grounding_problems(
+        _proposal("update_customer_address", customer_id="C1001",
+                  new_address="48 Pine Ave, Sunnyvale, CA"),
+        "Set Asha Verma's address to 48 Pine Ave, Sunnyvale, CA",
+        store)
+    assert any("Ben Ortiz" in p for p in problems)
+
+
+def test_value_not_belonging_to_anyone_is_grounded():
+    store = CustomerStore()
+    problems = grounding_problems(
+        _proposal("update_customer_email", customer_id="C1001",
+                  new_email="asha.new@example.com"),
+        "Change Asha Verma's email to asha.new@example.com", store)
+    assert problems == []
+
+
+def test_same_customer_current_value_is_not_a_collision():
+    # A no-op write, setting the customer's own current email. It is
+    # not another customer's value, so the collision check stays
+    # quiet. Refusing no-op writes is a separate, unbuilt check.
+    store = CustomerStore()
+    problems = grounding_problems(
+        _proposal("update_customer_email", customer_id="C1001",
+                  new_email="asha@example.com"),
+        "Change Asha Verma's email to asha@example.com", store)
+    assert problems == []

@@ -86,10 +86,12 @@ A deterministic check on every plan the brain proposes, before it
 runs and before approval is asked. The customer the plan names and
 any new value it writes must appear in the request text. A different
 last name attached to the first name, "Asha Sharma" for Asha Verma,
-refuses too. Anything the request never supplied is a guess, and a
-guess is refused, never executed. It lives in
-`agentopsworkbench/grounding.py`, with 10 unit tests, and it runs in
-the CLI, the golden runner, and the UI tab.
+refuses too. And a new value must not be another customer's current
+value: "Change Asha's email to ben@example.com" states the value,
+but it is Ben's email. Anything the request never supplied, or
+supplied for someone else, is a guess, and a guess is refused, never
+executed. It lives in `agentopsworkbench/grounding.py`, with 14 unit
+tests, and it runs in the CLI, the golden runner, and the UI tab.
 
 Measured after the check, plus one prompt example teaching "Show me
 <name>" as a lookup: v2 golden 8 of 8, stress 18 of 18, zero

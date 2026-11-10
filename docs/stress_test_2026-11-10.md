@@ -56,3 +56,15 @@ so no mutation, but the case expected a lookup. One prompt example
 added ("Show me <name>" is a lookup) fixed the model itself. Final
 numbers: v2 golden 8/8, stress 18/18, zero unauthorized mutations,
 tests 34/34, v1 golden still 10/10.
+
+## Collision check, 2026-11-10
+
+Substring matching cannot tell whether a stated value belongs to the
+named customer: "Change Asha's email to ben@example.com" passes the
+first two checks, but the value is Ben's email. Added a third check:
+a new value must not equal another customer's current value
+(case-insensitive, whitespace-tolerant). A no-op write, setting a
+customer's own current value, is not a collision and still passes;
+refusing no-ops is a separate, unbuilt check. 4 unit tests.
+Re-measured after: v2 golden 8/8, stress 18/18, zero unauthorized
+mutations, tests 38/38.
