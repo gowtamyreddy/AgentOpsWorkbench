@@ -14,7 +14,9 @@ Two checks, both plain string matching, no model involved:
    verbatim in the request, case-insensitive, trailing punctuation
    tolerated. And a new value must not be another customer's current
    value: "Change Asha's email to ben@example.com" states the value,
-   but it is Ben's email, not a new one for Asha.
+   but it is Ben's email, not a new one for Asha. A new value must
+   also differ from the same customer's current value: writing the
+   value a record already has is a no-op, not an update.
 
 A refused plan is never executed, so a grounding failure costs a
 refusal, never a wrong mutation.
@@ -79,6 +81,12 @@ def grounding_problems(proposal, request, store):
             problems.append(f"{field} {value!r} is not stated in the request")
         if value:
             store_field = _STORE_FIELD[field]
+            current = customer.get(store_field)
+            if current is not None and _same_value(value, current):
+                problems.append(
+                    f"{field} {value!r} is already the current "
+                    f"{store_field} (no-op)"
+                )
             for other_id, other in store.snapshot().items():
                 if other_id == customer_id:
                     continue

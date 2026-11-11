@@ -8,7 +8,10 @@ Rules, in order, for every step:
 3. Tool runs with a bounded retry budget, transient errors only.
    Exhausting the budget fails the run. No infinite loops.
 4. After all steps, the verifier re-reads the record and compares it
-   to the expected values. A mismatch fails the run loudly.
+   to the expected values, against a snapshot taken before the run.
+   Every field must match its before value except the expected
+   changes, and every other record must be unchanged. A mismatch
+   fails the run loudly.
 
 Run statuses: succeeded, refused, denied, failed, verification_failed.
 """
@@ -52,6 +55,7 @@ def run_plan(plan, allow_list, store, approver, verify_spec=None,
              faults=None, max_retries=3):
     trace = []
     faults = {k: dict(v) for k, v in (faults or {}).items()}
+    before = store.snapshot()
 
     for step in plan:
         tool_name = step["tool"]
@@ -100,7 +104,7 @@ def run_plan(plan, allow_list, store, approver, verify_spec=None,
                 return RunResult("failed", trace, store.snapshot())
 
     if verify_spec is not None:
-        ok, detail = run_verification(store, verify_spec)
+        ok, detail = run_verification(store, verify_spec, before=before)
         trace.append(TraceEntry("verify", verify_spec["tool"],
                                 "ok" if ok else "failed", detail))
         if not ok:

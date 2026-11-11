@@ -127,13 +127,22 @@ def test_value_not_belonging_to_anyone_is_grounded():
     assert problems == []
 
 
-def test_same_customer_current_value_is_not_a_collision():
-    # A no-op write, setting the customer's own current email. It is
-    # not another customer's value, so the collision check stays
-    # quiet. Refusing no-op writes is a separate, unbuilt check.
+def test_same_customer_current_value_is_a_noop():
+    # Writing the value a record already has is a no-op, not an
+    # update. It is refused, even though it is not a collision.
     store = CustomerStore()
     problems = grounding_problems(
         _proposal("update_customer_email", customer_id="C1001",
                   new_email="asha@example.com"),
         "Change Asha Verma's email to asha@example.com", store)
-    assert problems == []
+    assert any("no-op" in p for p in problems)
+
+
+def test_noop_address_is_refused():
+    store = CustomerStore()
+    problems = grounding_problems(
+        _proposal("update_customer_address", customer_id="C1002",
+                  new_address="48 Pine Ave, Sunnyvale, CA"),
+        "Set Ben Ortiz's address to 48 Pine Ave, Sunnyvale, CA",
+        store)
+    assert any("no-op" in p for p in problems)

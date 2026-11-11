@@ -107,6 +107,39 @@ def test_verification_catches_wrong_write():
     assert store.snapshot()["C1001"]["email"] == "wrong@example.com"
 
 
+def test_verification_catches_side_mutation():
+    store = CustomerStore()
+    steps, allow_list, verify = email_plan()
+    result = run_plan(steps, allow_list, store, always_approve,
+                      verify_spec=verify,
+                      faults={"update_customer_email":
+                              {"write_extra": {"address": "1 Wrong Rd"}}})
+    assert result.status == "verification_failed"
+    assert "address" in result.trace[-1].detail
+    assert store.snapshot()["C1001"]["address"] == "1 Wrong Rd"
+
+
+def test_verification_catches_wrong_target_write():
+    store = CustomerStore()
+    steps, allow_list, verify = email_plan()
+    result = run_plan(steps, allow_list, store, always_approve,
+                      verify_spec=verify,
+                      faults={"update_customer_email":
+                              {"write_target": "C1002"}})
+    assert result.status == "verification_failed"
+    assert store.snapshot()["C1002"]["email"] == "asha.new@example.com"
+    assert store.snapshot()["C1001"]["email"] == "asha@example.com"
+
+
+def test_verification_passes_when_only_expected_field_changes():
+    store = CustomerStore()
+    steps, allow_list, verify = email_plan()
+    result = run_plan(steps, allow_list, store, always_approve,
+                      verify_spec=verify)
+    assert result.status == "succeeded"
+    assert store.snapshot()["C1001"]["email"] == "asha.new@example.com"
+
+
 def test_denial_is_terminal_even_when_tool_would_fail():
     store = CustomerStore()
     steps, allow_list, verify = email_plan()

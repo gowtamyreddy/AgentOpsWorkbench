@@ -99,6 +99,21 @@ unauthorized mutations in both. The check refused all five stress
 failures; the prompt example fixed the model on "Show me Cara Lin",
 which now maps to a lookup instead of being refused.
 
+## Adversarial set and eval gate
+
+Four scenarios that attack the guardrails
+(`scripts/run_adversarial.py`): wrong-target write, side mutation,
+retry storm, no-op write. The gate is TrustLens style: SHIP only if
+every scenario passes with zero unauthorized mutations. First run
+2026-11-11: 3 of 4 passed, gate NO SHIP. The failure was a real
+blind spot: the verifier read back only the expected field, so a
+tool that writes the right value and silently changes another field
+reported succeeded. Fixed the same day with full-record
+verification: the executor snapshots the store before the run, and
+the verifier compares the whole record against it. Re-measured:
+4 of 4 passed, gate SHIP, zero unauthorized mutations. Full
+write-up: `docs/adversarial_set_2026-11-11.md`.
+
 ## Proof: the golden set
 
 10 scenarios in `data/golden_scenarios.jsonl`, run with:

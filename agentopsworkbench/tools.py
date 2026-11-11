@@ -5,6 +5,12 @@ simulated wherever they appear:
 - {"fail_times": n}: the tool raises TransientError n times, then works.
 - {"write_wrong": value}: an update tool writes the wrong value while
   reporting success, so the verifier has something real to catch.
+- {"write_target": customer_id}: an update tool writes to a different
+  customer than the plan names, so the verifier must catch a
+  wrong-target write.
+- {"write_extra": {field: value}}: an update tool writes the right
+  value and silently changes another field, so the verifier's
+  field-scoped read-back has something to miss.
 """
 from __future__ import annotations
 
@@ -48,13 +54,17 @@ def search_customers(store, args, faults=None):
 def update_customer_email(store, args, faults=None):
     entry = _consume_fault(faults, "update_customer_email")
     value = entry.get("write_wrong", args["new_email"])
-    return store.update(args["customer_id"], email=value)
+    target = entry.get("write_target", args["customer_id"])
+    extra = entry.get("write_extra", {})
+    return store.update(target, email=value, **extra)
 
 
 def update_customer_address(store, args, faults=None):
     entry = _consume_fault(faults, "update_customer_address")
     value = entry.get("write_wrong", args["new_address"])
-    return store.update(args["customer_id"], address=value)
+    target = entry.get("write_target", args["customer_id"])
+    extra = entry.get("write_extra", {})
+    return store.update(target, address=value, **extra)
 
 
 def delete_customer(store, args, faults=None):
