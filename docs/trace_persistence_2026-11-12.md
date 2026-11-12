@@ -23,3 +23,13 @@ list, missing run, replay of a succeeded run, replay of a denied
 run, replay of a refused record). Live check: a rule run saved and
 replayed MATCH; a collision refusal saved its record. v1 golden
 10/10, adversarial 4/4, gate SHIP, zero unauthorized mutations.
+
+Runs tab (2026-11-12): a fourth UI tab lists the saved runs
+(newest first), shows the full record for one, and replays it from
+the browser, reusing the tab-3 model instance when it is loaded.
+Verified live: UI answers HTTP 200, all four tabs and all six
+buttons present in the served config; the tab's list, show, and
+replay functions run against the real runs/ directory, and an LLM
+refusal replays refused/MATCH. Tests 51/51 (3 new: summaries
+newest-first, replay_record on a succeeded run, replay_record on a
+denied run).

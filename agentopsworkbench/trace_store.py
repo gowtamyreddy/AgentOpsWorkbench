@@ -62,6 +62,25 @@ def list_runs(base=None):
     return sorted(runs_dir(base).glob("run-*.json"))
 
 
+def summarize(record):
+    task = record.get("task") or (record.get("request") or "")[:60]
+    return {
+        "run_id": record.get("run_id"),
+        "timestamp": record.get("timestamp"),
+        "source": record.get("source"),
+        "brain": record.get("brain"),
+        "task": task,
+        "status": record.get("status"),
+    }
+
+
+def list_run_summaries(base=None):
+    summaries = [summarize(json.loads(p.read_text()))
+                 for p in list_runs(base)]
+    return sorted(summaries, key=lambda s: s["timestamp"] or "",
+                  reverse=True)
+
+
 def load_run(run_id, base=None):
     directory = runs_dir(base)
     path = directory / f"run-{run_id}.json"

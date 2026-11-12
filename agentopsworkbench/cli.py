@@ -23,6 +23,7 @@ from .brain import LLMBrain, RuleBrain
 from .executor import run_plan
 from .grounding import grounding_problems
 from .policy import TASKS, build_plan
+from .replay import replay_record
 from .store import CustomerStore
 from .trace_store import build_record, load_run, save_run
 
@@ -34,47 +35,14 @@ def replay(run_id, base=None):
     except FileNotFoundError as exc:
         print(exc)
         return 1
-    store = CustomerStore()
-    decisions = [e["status"] == "approved"
-                 for e in record["trace"] if e["kind"] == "approval"]
-
-    def approver(tool_name, args):
-        return decisions.pop(0) if decisions else True
-
-    if record.get("request"):
-        brain = LLMBrain()
-        proposal = brain.plan(record["request"])
-        print(f"Brain proposed: {proposal.raw[:300]}")
-        if not proposal.ok:
-            status, after = "refused", store.snapshot()
-        else:
-            grounded = grounding_problems(proposal, record["request"], store)
-            if grounded:
-                print(f"Refused (not grounded): {'; '.join(grounded)}")
-                status, after = "refused", store.snapshot()
-            else:
-                steps, allow_list, verify_spec = build_plan(
-                    proposal.task, proposal.inputs
-                )
-                result = run_plan(steps, allow_list, store, approver,
-                                  verify_spec=verify_spec)
-                status, after = result.status, result.store_snapshot
-    else:
-        try:
-            steps, allow_list, verify_spec = build_plan(
-                record["task"], record["inputs"]
-            )
-        except ValueError:
-            status, after = "refused", store.snapshot()
-        else:
-            result = run_plan(steps, allow_list, store, approver,
-                              verify_spec=verify_spec)
-            status, after = result.status, result.store_snapshot
-    match = status == record["status"] and after == record["store_after"]
-    print(f"Original: {record['status']} (run {record.get('run_id')})")
-    print(f"Replay:   {status}")
-    print("MATCH" if match else "DIFF: replay outcome differs from the saved run")
-    return 0 if match else 1
+    result = replay_record(record)
+    if result["proposal_raw"]:
+        print(f"Brain proposed: {result['proposal_raw'][:300]}")
+    print(f"Original: {result['original_status']} (run {record.get('run_id')})")
+    print(f"Replay:   {result['status']}")
+    print("MATCH" if result["match"]
+          else "DIFF: replay outcome differs from the saved run")
+    return 0 if result["match"] else 1
 
 
 def main(argv=None):

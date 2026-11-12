@@ -130,6 +130,8 @@ Replay re-runs the same plan or request against a fresh store and
 reports MATCH or DIFF. Recorded approval decisions are honored,
 so a run that was denied replays denied. Batch runners (golden,
 stress, adversarial) print their results and do not save records.
+The UI has a fourth tab, Runs, that lists the saved runs, shows
+the full record for one, and replays it from the browser.
 
 ## Proof: the golden set
 

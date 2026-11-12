@@ -5,9 +5,10 @@ from agentopsworkbench.approval import always_approve, always_deny
 from agentopsworkbench.cli import replay
 from agentopsworkbench.executor import run_plan
 from agentopsworkbench.policy import build_plan
+from agentopsworkbench.replay import replay_record
 from agentopsworkbench.store import CustomerStore
 from agentopsworkbench.trace_store import (
-    build_record, list_runs, load_run, save_run,
+    build_record, list_run_summaries, list_runs, load_run, save_run,
 )
 
 
@@ -78,3 +79,39 @@ def test_replay_refused_rule_record_matches(tmp_path):
         store_before=store.snapshot(), store_after=store.snapshot())
     path = save_run(record, base=tmp_path)
     assert replay(_run_id(path), base=tmp_path) == 0
+
+
+def test_summaries_newest_first(tmp_path):
+    old = build_record(source="cli", brain="rule",
+                       task="lookup_customer",
+                       inputs={"customer_id": "C1002"},
+                       status="succeeded")
+    old["timestamp"] = "2026-11-12T10:00:00+00:00"
+    new = build_record(source="cli", brain="rule",
+                       task="lookup_customer",
+                       inputs={"customer_id": "C1003"},
+                       status="succeeded")
+    new["timestamp"] = "2026-11-12T11:00:00+00:00"
+    save_run(old, base=tmp_path)
+    save_run(new, base=tmp_path)
+    summaries = list_run_summaries(base=tmp_path)
+    assert [s["task"] for s in summaries] == [
+        "lookup_customer", "lookup_customer"]
+    assert summaries[0]["timestamp"] > summaries[1]["timestamp"]
+    assert summaries[0]["status"] == "succeeded"
+
+
+def test_replay_record_matches(tmp_path):
+    path = _saved_rule_run(tmp_path)
+    record = load_run(_run_id(path), base=tmp_path)
+    result = replay_record(record)
+    assert result["match"] is True
+    assert result["status"] == "succeeded"
+
+
+def test_replay_record_denied_matches(tmp_path):
+    path = _saved_rule_run(tmp_path, approver=always_deny)
+    record = load_run(_run_id(path), base=tmp_path)
+    result = replay_record(record)
+    assert result["match"] is True
+    assert result["status"] == "denied"

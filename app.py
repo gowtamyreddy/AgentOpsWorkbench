@@ -20,7 +20,10 @@ from agentopsworkbench.brain import LLMBrain
 from agentopsworkbench.executor import run_plan
 from agentopsworkbench.grounding import grounding_problems
 from agentopsworkbench.policy import TASKS, build_plan
-from agentopsworkbench.trace_store import build_record, save_run
+from agentopsworkbench.replay import replay_record
+from agentopsworkbench.trace_store import (
+    build_record, list_run_summaries, load_run, save_run,
+)
 from agentopsworkbench.store import SEED, CustomerStore
 
 ROOT = Path(__file__).resolve().parent
@@ -128,12 +131,45 @@ def run_request(request, approve):
             json.dumps(record, indent=2))
 
 
+def run_choices():
+    return [(f"{s['timestamp']} | {s['status']} | {s['task']}",
+             s["run_id"]) for s in list_run_summaries()]
+
+
+def refresh_runs():
+    return gr.update(choices=run_choices())
+
+
+def show_run(run_id):
+    if not run_id:
+        return "Pick a run first."
+    return json.dumps(load_run(run_id), indent=2)
+
+
+def replay_run_ui(run_id):
+    global _llm_brain
+    if not run_id:
+        return "Pick a run first."
+    record = load_run(run_id)
+    if record.get("request") and _llm_brain is None:
+        _llm_brain = LLMBrain()
+    result = replay_record(record, llm_brain=_llm_brain)
+    lines = [
+        f"Original: {result['original_status']}",
+        f"Replay:   {result['status']}",
+        "MATCH" if result["match"]
+        else "DIFF: replay outcome differs from the saved run",
+    ]
+    return "\n".join(lines)
+
+
 with gr.Blocks(title="AgentOps Workbench") as demo:
     gr.Markdown("# AgentOps Workbench: test UI")
     gr.Markdown(
         "Same guardrailed executor as the CLI. Fake customer store, "
         "in-memory: every run starts from the seed data again, "
-        "so nothing persists."
+        "so the store never keeps a change. Run records are saved "
+        "to runs/ and listed in the Runs tab."
     )
 
     with gr.Tab("Try a task"):
@@ -203,6 +239,25 @@ with gr.Blocks(title="AgentOps Workbench") as demo:
             inputs=[request, approve_llm],
             outputs=[status_llm, plan_llm, trace_llm, record_llm],
         )
+
+    with gr.Tab("Runs"):
+        gr.Markdown(
+            "Every run from the command line or the UI saves its trace "
+            "to runs/run-<id>.json. Pick one to see the full record, "
+            "or replay it against a fresh store."
+        )
+        run_picker = gr.Dropdown(choices=run_choices(),
+                                 label="Saved runs")
+        refresh_btn = gr.Button("Refresh list")
+        show_btn = gr.Button("Show record")
+        replay_btn = gr.Button("Replay run", variant="primary")
+        run_detail = gr.Textbox(label="Record", lines=20)
+        replay_out = gr.Textbox(label="Replay result", lines=5)
+        refresh_btn.click(refresh_runs, outputs=run_picker)
+        show_btn.click(show_run, inputs=run_picker,
+                       outputs=run_detail)
+        replay_btn.click(replay_run_ui, inputs=run_picker,
+                         outputs=replay_out)
 
 
 if __name__ == "__main__":
