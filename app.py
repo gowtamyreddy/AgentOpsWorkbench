@@ -20,6 +20,7 @@ from agentopsworkbench.brain import LLMBrain
 from agentopsworkbench.executor import run_plan
 from agentopsworkbench.grounding import grounding_problems
 from agentopsworkbench.policy import TASKS, build_plan
+from agentopsworkbench.trace_store import build_record, save_run
 from agentopsworkbench.store import SEED, CustomerStore
 
 ROOT = Path(__file__).resolve().parent
@@ -54,11 +55,17 @@ def run_task(task, customer_id, new_email, new_address, approve):
     except ValueError as exc:
         return "error", str(exc), ""
     store = CustomerStore()
+    before = store.snapshot()
     approver = always_approve if approve else always_deny
     result = run_plan(steps, allow_list, store, approver,
                       verify_spec=verify_spec)
+    path = save_run(build_record(
+        source="ui", brain="rule", task=task, inputs=inputs, plan=steps,
+        status=result.status, trace=result.trace,
+        store_before=before, store_after=result.store_snapshot))
     record = result.store_snapshot.get(customer_id)
-    return result.status, format_trace(result), json.dumps(record, indent=2)
+    return (result.status, format_trace(result) + f"\nrun saved: {path}",
+            json.dumps(record, indent=2))
 
 
 def run_golden():
@@ -85,13 +92,24 @@ def run_request(request, approve):
     plan_text = json.dumps(
         {"task": proposal.task, **proposal.inputs}, indent=2
     ) if proposal.ok else f"no plan: {proposal.error}"
-    if not proposal.ok:
-        return "refused", plan_text, "", ""
     store = CustomerStore()
+    before = store.snapshot()
+    if not proposal.ok:
+        path = save_run(build_record(
+            source="ui", brain="llm", request=request,
+            refusal_reason=proposal.error, status="refused",
+            store_before=before, store_after=before))
+        return "refused", plan_text + f"\nrun saved: {path}", "", ""
     grounded = grounding_problems(proposal, request, store)
     if grounded:
+        path = save_run(build_record(
+            source="ui", brain="llm", request=request,
+            grounding_problems=grounded,
+            refusal_reason="; ".join(grounded), status="refused",
+            store_before=before, store_after=before))
         return ("refused",
-                plan_text + "\n\nNot grounded: " + "; ".join(grounded),
+                plan_text + "\n\nNot grounded: " + "; ".join(grounded)
+                + f"\nrun saved: {path}",
                 "", "")
     steps, allow_list, verify_spec = build_plan(
         proposal.task, proposal.inputs
@@ -99,8 +117,14 @@ def run_request(request, approve):
     approver = always_approve if approve else always_deny
     result = run_plan(steps, allow_list, store, approver,
                       verify_spec=verify_spec)
+    path = save_run(build_record(
+        source="ui", brain="llm", request=request,
+        task=proposal.task, inputs=proposal.inputs, plan=steps,
+        status=result.status, trace=result.trace,
+        store_before=before, store_after=result.store_snapshot))
     record = result.store_snapshot.get(proposal.inputs["customer_id"])
-    return (result.status, plan_text, format_trace(result),
+    return (result.status, plan_text,
+            format_trace(result) + f"\nrun saved: {path}",
             json.dumps(record, indent=2))
 
 

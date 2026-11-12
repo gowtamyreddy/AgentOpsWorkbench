@@ -114,6 +114,23 @@ the verifier compares the whole record against it. Re-measured:
 4 of 4 passed, gate SHIP, zero unauthorized mutations. Full
 write-up: `docs/adversarial_set_2026-11-11.md`.
 
+## Trace persistence and replay
+
+Every run from the command line or the UI saves its trace to
+`runs/run-<id>.json`: what was asked, the plan, the grounding
+result, the status, the full trace, and the store before and after.
+A failure can be replayed later instead of being reconstructed
+from memory:
+
+```bash
+python -m agentopsworkbench.cli --replay <run-id>
+```
+
+Replay re-runs the same plan or request against a fresh store and
+reports MATCH or DIFF. Recorded approval decisions are honored,
+so a run that was denied replays denied. Batch runners (golden,
+stress, adversarial) print their results and do not save records.
+
 ## Proof: the golden set
 
 10 scenarios in `data/golden_scenarios.jsonl`, run with:
@@ -123,5 +140,5 @@ python scripts/run_golden.py
 python -m pytest tests/ -q
 ```
 
-10 of 10 pass, 12 of 12 tests pass, and no unauthorized changes to
+10 of 10 pass, 48 of 48 tests pass, and no unauthorized changes to
 the store.
