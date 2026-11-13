@@ -16,7 +16,7 @@ from pathlib import Path
 import gradio as gr
 
 from agentopsworkbench.approval import always_approve, always_deny
-from agentopsworkbench.brain import LLMBrain
+from agentopsworkbench.brain import LLMBrain, MODEL_ID
 from agentopsworkbench.executor import run_plan
 from agentopsworkbench.grounding import grounding_problems
 from agentopsworkbench.policy import TASKS, build_plan
@@ -82,15 +82,17 @@ def run_golden():
 
 
 _llm_brain = None
+_llm_model_id = None
 
 
-def run_request(request, approve):
+def run_request(request, approve, model_id):
     """Plain-language request through the LLM brain (v2)."""
-    global _llm_brain
+    global _llm_brain, _llm_model_id
     if not request.strip():
         return "needs input", "", "", ""
-    if _llm_brain is None:
-        _llm_brain = LLMBrain()
+    if _llm_brain is None or _llm_model_id != model_id:
+        _llm_brain = LLMBrain(model_id)
+        _llm_model_id = model_id
     proposal = _llm_brain.plan(request)
     plan_text = json.dumps(
         {"task": proposal.task, **proposal.inputs}, indent=2
@@ -99,14 +101,14 @@ def run_request(request, approve):
     before = store.snapshot()
     if not proposal.ok:
         path = save_run(build_record(
-            source="ui", brain="llm", request=request,
+            source="ui", brain="llm", model=model_id, request=request,
             refusal_reason=proposal.error, status="refused",
             store_before=before, store_after=before))
         return "refused", plan_text + f"\nrun saved: {path}", "", ""
     grounded = grounding_problems(proposal, request, store)
     if grounded:
         path = save_run(build_record(
-            source="ui", brain="llm", request=request,
+            source="ui", brain="llm", model=model_id, request=request,
             grounding_problems=grounded,
             refusal_reason="; ".join(grounded), status="refused",
             store_before=before, store_after=before))
@@ -121,7 +123,7 @@ def run_request(request, approve):
     result = run_plan(steps, allow_list, store, approver,
                       verify_spec=verify_spec)
     path = save_run(build_record(
-        source="ui", brain="llm", request=request,
+        source="ui", brain="llm", model=model_id, request=request,
         task=proposal.task, inputs=proposal.inputs, plan=steps,
         status=result.status, trace=result.trace,
         store_before=before, store_after=result.store_snapshot))
@@ -147,12 +149,15 @@ def show_run(run_id):
 
 
 def replay_run_ui(run_id):
-    global _llm_brain
+    global _llm_brain, _llm_model_id
     if not run_id:
         return "Pick a run first."
     record = load_run(run_id)
-    if record.get("request") and _llm_brain is None:
-        _llm_brain = LLMBrain()
+    model_id = record.get("model")
+    if record.get("request") and model_id:
+        if _llm_brain is None or _llm_model_id != model_id:
+            _llm_brain = LLMBrain(model_id)
+            _llm_model_id = model_id
     result = replay_record(record, llm_brain=_llm_brain)
     lines = [
         f"Original: {result['original_status']}",
@@ -216,9 +221,14 @@ with gr.Blocks(title="AgentOps Workbench") as demo:
 
     with gr.Tab("Ask in plain language (v2)"):
         gr.Markdown(
-            "A small local model (Qwen2.5-0.5B-Instruct) picks the task. "
+            "A small local model picks the task. "
             "The same guardrails run the plan. First run downloads the "
-            "model (about 1 GB) and takes a while; later runs reuse it."
+            "model and takes a while; later runs reuse it."
+        )
+        model_id = gr.Dropdown(
+            choices=["Qwen/Qwen2.5-0.5B-Instruct",
+                     "Qwen/Qwen2.5-1.5B-Instruct"],
+            value=MODEL_ID, label="Model",
         )
         request = gr.Textbox(
             label="Request",
@@ -236,7 +246,7 @@ with gr.Blocks(title="AgentOps Workbench") as demo:
                                 lines=8)
         ask_btn.click(
             run_request,
-            inputs=[request, approve_llm],
+            inputs=[request, approve_llm, model_id],
             outputs=[status_llm, plan_llm, trace_llm, record_llm],
         )
 

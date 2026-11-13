@@ -74,12 +74,14 @@ def run_case(brain, case):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--file", default="data/golden_requests.jsonl")
+    parser.add_argument("--model", default="Qwen/Qwen2.5-0.5B-Instruct")
     args = parser.parse_args()
     path = Path(__file__).resolve().parents[1] / args.file
     cases = [
         json.loads(line) for line in path.read_text().splitlines() if line.strip()
     ]
-    brain = LLMBrain()
+    print(f"Model: {args.model}")
+    brain = LLMBrain(args.model)
     passed = 0
     plans_valid = 0
     total_unauthorized = 0

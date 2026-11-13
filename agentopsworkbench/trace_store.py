@@ -26,13 +26,14 @@ def new_run_id():
     return f"{stamp}-{secrets.token_hex(3)}"
 
 
-def build_record(*, source, brain, request=None, task=None, inputs=None,
-                 plan=None, grounding_problems=None, refusal_reason=None,
-                 status=None, trace=None, store_before=None,
-                 store_after=None):
+def build_record(*, source, brain, model=None, request=None, task=None,
+                 inputs=None, plan=None, grounding_problems=None,
+                 refusal_reason=None, status=None, trace=None,
+                 store_before=None, store_after=None):
     return {
         "source": source,
         "brain": brain,
+        "model": model,
         "request": request,
         "task": task,
         "inputs": inputs or {},

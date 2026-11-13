@@ -19,7 +19,7 @@ import argparse
 import json
 
 from .approval import always_approve, console_approver
-from .brain import LLMBrain, RuleBrain
+from .brain import LLMBrain, MODEL_ID, RuleBrain
 from .executor import run_plan
 from .grounding import grounding_problems
 from .policy import TASKS, build_plan
@@ -56,6 +56,8 @@ def main(argv=None):
     parser.add_argument("--brain", choices=["rule", "llm"], default="rule")
     parser.add_argument("--request",
                         help="plain-language request (LLM brain only)")
+    parser.add_argument("--model", default=MODEL_ID,
+                        help="LLM brain model id")
     parser.add_argument("--replay", help="re-run a saved run by id")
     args = parser.parse_args(argv)
 
@@ -67,15 +69,16 @@ def main(argv=None):
 
     def save_refused(**fields):
         path = save_run(build_record(
-            source="cli", brain=args.brain, store_before=before,
-            store_after=before, status="refused", **fields))
+            source="cli", brain=args.brain, model=args.model,
+            store_before=before, store_after=before, status="refused",
+            **fields))
         print(f"Run saved: {path}")
         return 1
 
     if args.brain == "llm":
         if not args.request:
             parser.error("--brain llm needs --request")
-        brain = LLMBrain()
+        brain = LLMBrain(args.model)
         proposal = brain.plan(args.request)
         print(f"Brain proposed: {proposal.raw[:300]}")
         if not proposal.ok:
@@ -114,8 +117,8 @@ def main(argv=None):
     result = run_plan(steps, allow_list, store, approver,
                       verify_spec=verify_spec)
     path = save_run(build_record(
-        source="cli", brain=args.brain, request=args.request,
-        task=task_name, inputs=inputs, plan=steps,
+        source="cli", brain=args.brain, model=args.model,
+        request=args.request, task=task_name, inputs=inputs, plan=steps,
         status=result.status, trace=result.trace,
         store_before=before, store_after=result.store_snapshot))
 

@@ -7,7 +7,7 @@ should match.
 """
 from __future__ import annotations
 
-from .brain import LLMBrain
+from .brain import LLMBrain, MODEL_ID
 from .executor import run_plan
 from .grounding import grounding_problems
 from .policy import build_plan
@@ -24,7 +24,7 @@ def replay_record(record, llm_brain=None):
 
     proposal_raw = None
     if record.get("request"):
-        brain = llm_brain or LLMBrain()
+        brain = llm_brain or LLMBrain(record.get("model") or MODEL_ID)
         proposal = brain.plan(record["request"])
         proposal_raw = proposal.raw
         if not proposal.ok:
