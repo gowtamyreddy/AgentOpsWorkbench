@@ -80,6 +80,22 @@ request, gibberish, or "Show me Cara Lin", which it turned into an
 email update with a value copied from the prompt example. Full
 write-up: `docs/stress_test_2026-11-10.md`.
 
+Bigger model, 2026-11-13: the brain takes a `--model` flag
+(`scripts/run_golden_llm.py --model Qwen/Qwen2.5-1.5B-Instruct`),
+and the UI tab has a model dropdown. The 1.5B run on a MacBook Air:
+golden 8/8, stress 17/18, zero unauthorized mutations in both.
+The one miss was S05, "What is Ben's address?", which the model
+read as an update and invented an address for; grounding refused
+it, so no mutation, but the case expected a lookup. The prompt had
+an email-question example and a "Show me" example, but no
+address-question example. One was added ("What is Cara Lin's
+address?" is a lookup), and the 0.5B re-measured 8/8 golden and
+18/18 stress with zero mutations. The 1.5B re-run with the fix is
+still to confirm on the Mac. The bigger model is not better here:
+same golden, one worse on stress, and 5 to 11 times slower per
+request. The 0.5B stays the default brain. Full write-up:
+`docs/model_1.5b_2026-11-13.md`.
+
 ## The grounding check (v2.1)
 
 A deterministic check on every plan the brain proposes, before it

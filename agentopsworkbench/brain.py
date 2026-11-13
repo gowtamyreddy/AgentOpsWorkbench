@@ -149,6 +149,8 @@ def build_messages(request):
         '{"task": "lookup_customer", "customer_id": "C1002"}\n\n'
         "Request: What is Asha Verma's email?\n"
         '{"task": "lookup_customer", "customer_id": "C1001"}\n\n'
+        "Request: What is Cara Lin's address?\n"
+        '{"task": "lookup_customer", "customer_id": "C1003"}\n\n'
         "Request: Show me Cara Lin\n"
         '{"task": "lookup_customer", "customer_id": "C1003"}\n\n'
         "Request: Update the email for Zoe to zoe@example.com\n"
