@@ -12,6 +12,11 @@ model picks the task; the same guardrails run the plan.
 
 Every run saves its trace to runs/run-<id>.json. Replay one with:
   python -m agentopsworkbench.cli --replay <run-id>
+
+The store is persisted to store.json: an approved update sticks
+between runs. Only a run that passes verification writes it, so a
+refused, denied, failed, or verification-failed run never changes
+it. Reset it with --fresh, or point at another file with --store.
 """
 from __future__ import annotations
 
@@ -24,7 +29,7 @@ from .executor import run_plan
 from .grounding import grounding_problems
 from .policy import TASKS, build_plan
 from .replay import replay_record
-from .store import CustomerStore
+from .store import load_store
 from .trace_store import build_record, load_run, save_run
 
 
@@ -58,13 +63,20 @@ def main(argv=None):
                         help="plain-language request (LLM brain only)")
     parser.add_argument("--model", default=MODEL_ID,
                         help="LLM brain model id")
+    parser.add_argument("--store",
+                        help="store file (default: store.json)")
+    parser.add_argument("--fresh", action="store_true",
+                        help="reset the store to the seed data first")
     parser.add_argument("--replay", help="re-run a saved run by id")
     args = parser.parse_args(argv)
 
     if args.replay:
         return replay(args.replay)
 
-    store = CustomerStore()
+    store = load_store(args.store)
+    if args.fresh:
+        store.reset()
+        print(f"Store reset to seed data: {store.path}")
     before = store.snapshot()
 
     def save_refused(**fields):
@@ -126,6 +138,7 @@ def main(argv=None):
     for entry in result.trace:
         print(f"  [{entry.kind}] {entry.tool}: {entry.status} - {entry.detail}")
     print(json.dumps(result.store_snapshot.get(customer_id), indent=2))
+    print(f"Store: {store.path}")
     print(f"Run saved: {path}")
     return 0 if result.status == "succeeded" else 1
 

@@ -35,18 +35,28 @@ answer. Re-measured on the 0.5B after the fix: golden 8/8, stress
 Note on the re-run: the first 1.5B re-run on the Mac (2026-11-13,
 13:57) still failed S05 identically, 17/18, because the fix had
 not been pushed yet and the Mac was still running the old prompt.
-That run also came in faster (avg 46.4 s per request, total
-834.6 s, vs 129.3 s and 2,327.8 s the first time), for no recorded
-reason; the machines and load differed. The fix was pushed after
-that run; the 1.5B re-run with the fix is still to confirm.
+The fix was pushed after that run (commit 789b3095). The re-run
+with the fix (2026-11-13, 15:23) passed: 18/18, plans valid
+10/18, zero unauthorized mutations, avg 17.1 s per request. S05
+answers as a lookup. The 1.5B now ties the 0.5B on both sets.
+
+Speed, corrected: the first 1.5B runs were cold. Per-request
+averages fell across runs on the same machine: stress 129.3 s,
+then 46.4 s, then 17.1 s. Warm, the 1.5B runs stress at 17.1 s
+per request against the 0.5B's 12.0 s, about 1.4x slower, not the
+5 to 11 times the first cold runs suggested. The 0.5B still stays
+the default: same results, smaller, faster.
 
 ## Verdict
 
-The bigger model is not better here: same golden, one worse on
-stress, 5 to 11 times slower per request. The 0.5B stays the
-default brain. The model is selectable (`--model` in the CLI and
-the golden runner, a dropdown in the UI tab), and run records store
-which model produced them, so a replay uses the same model.
+The bigger model ties the smaller one after one prompt example:
+golden 8/8 both ways, stress 18/18 both ways, zero unauthorized
+mutations in every run. Warm, the 1.5B runs stress at 17.1 s per
+request against the 0.5B's 12.0 s. The 0.5B stays the default
+brain: same results, smaller, faster. The model is selectable
+(`--model` in the CLI and the golden runner, a dropdown in the UI
+tab), and run records store which model produced them, so a replay
+uses the same model.
 
 ## Note on the run
 

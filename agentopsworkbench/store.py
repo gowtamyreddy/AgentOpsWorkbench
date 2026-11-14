@@ -1,7 +1,18 @@
-"""Fake customer store. In-memory only; nothing real is ever at risk."""
+"""Fake customer store. In-memory by default; optionally persisted to JSON.
+
+With no path, every run starts from the seed, as before: golden
+runs, stress runs, the adversarial set, and replays all stay
+isolated and deterministic. With a path, the store loads that JSON
+file when it exists (seeding and saving it on first use), and the
+executor saves it after a run whose verification passed. A
+refused, denied, failed, or verification-failed run never writes
+the file, so only verified state persists.
+"""
 from __future__ import annotations
 
 import copy
+import json
+from pathlib import Path
 
 SEED = {
     "C1001": {
@@ -28,11 +39,37 @@ SEED = {
 }
 
 
-class CustomerStore:
-    """A tiny in-memory customer record store for the v1 demo."""
+def default_store_path():
+    return Path(__file__).resolve().parents[1] / "store.json"
 
-    def __init__(self, seed=None):
+
+class CustomerStore:
+    """A tiny customer record store for the v1 demo."""
+
+    def __init__(self, seed=None, path=None):
+        self._path = Path(path) if path is not None else None
+        if self._path is not None and self._path.exists():
+            self._data = json.loads(self._path.read_text())
+        else:
+            self._data = copy.deepcopy(seed or SEED)
+            self.save()
+
+    @property
+    def path(self):
+        return self._path
+
+    def save(self):
+        """Write the current state to disk. A no-op for in-memory stores."""
+        if self._path is None:
+            return
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        self._path.write_text(json.dumps(self._data, indent=2))
+
+    def reset(self, seed=None):
+        """Restore the seed data and save it. Returns the seed snapshot."""
         self._data = copy.deepcopy(seed or SEED)
+        self.save()
+        return copy.deepcopy(self._data)
 
     def get(self, customer_id):
         record = self._data.get(customer_id)
@@ -59,3 +96,8 @@ class CustomerStore:
 
     def snapshot(self):
         return copy.deepcopy(self._data)
+
+
+def load_store(path=None):
+    """Load the persistent store (project-root store.json by default)."""
+    return CustomerStore(path=path or default_store_path())

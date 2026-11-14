@@ -90,11 +90,11 @@ it, so no mutation, but the case expected a lookup. The prompt had
 an email-question example and a "Show me" example, but no
 address-question example. One was added ("What is Cara Lin's
 address?" is a lookup), and the 0.5B re-measured 8/8 golden and
-18/18 stress with zero mutations. The 1.5B re-run with the fix is
-still to confirm on the Mac. The bigger model is not better here:
-same golden, one worse on stress, and 5 to 11 times slower per
-request. The 0.5B stays the default brain. Full write-up:
-`docs/model_1.5b_2026-11-13.md`.
+18/18 stress with zero mutations. The 1.5B re-run with the fix
+passed 18/18 too, so the bigger model ties the smaller one; warm,
+it runs stress at 17.1 s per request against the 0.5B's 12.0 s.
+The 0.5B stays the default: same results, smaller, faster. Full
+write-up: `docs/model_1.5b_2026-11-13.md`.
 
 ## The grounding check (v2.1)
 
@@ -148,6 +148,21 @@ so a run that was denied replays denied. Batch runners (golden,
 stress, adversarial) print their results and do not save records.
 The UI has a fourth tab, Runs, that lists the saved runs, shows
 the full record for one, and replays it from the browser.
+
+## Persistent store
+
+The customer store is persisted to `store.json`. An approved
+update sticks between runs, in the CLI and in the UI, and the UI
+shows the current customers on its first and third tabs, with a
+Reset button that restores the three seed customers.
+
+One rule governs what reaches the file: the executor saves the
+store only after a run whose verification passed. A refused,
+denied, failed, or verification-failed run never writes it, so
+only verified state persists. Golden runs, stress runs, the
+adversarial set, and replays still use an in-memory store, so
+they stay isolated and deterministic. Full write-up:
+`docs/persistent_store_2026-11-14.md`.
 
 ## Proof: the golden set
 

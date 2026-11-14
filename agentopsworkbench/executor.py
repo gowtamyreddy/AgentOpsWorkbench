@@ -14,6 +14,10 @@ Rules, in order, for every step:
    fails the run loudly.
 
 Run statuses: succeeded, refused, denied, failed, verification_failed.
+
+A run that succeeds persists the store (store.save()), so only
+verified state ever reaches disk. Any other outcome leaves the
+persistent store untouched.
 """
 from __future__ import annotations
 
@@ -109,5 +113,10 @@ def run_plan(plan, allow_list, store, approver, verify_spec=None,
                                 "ok" if ok else "failed", detail))
         if not ok:
             return RunResult("verification_failed", trace, store.snapshot())
+
+    # Only a run that passed verification reaches the persistent store.
+    # Refused, denied, failed, and verification-failed runs never write
+    # it. For an in-memory store this is a no-op.
+    store.save()
 
     return RunResult("succeeded", trace, store.snapshot())

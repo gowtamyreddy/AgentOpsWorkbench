@@ -3,8 +3,10 @@
 This is a thin front end over the same executor, store, and guardrails
 as the CLI. Nothing here re-implements the agent.
 
-The store is fake and in-memory: every run starts from the seed
-customers again, so no change ever persists.
+The store is persisted to store.json: an approved update sticks
+between runs. Only a run that passes verification writes it, so a
+refused, denied, or failed run never changes it. Reset restores the
+three seed customers.
 """
 from __future__ import annotations
 
@@ -24,11 +26,21 @@ from agentopsworkbench.replay import replay_record
 from agentopsworkbench.trace_store import (
     build_record, list_run_summaries, load_run, save_run,
 )
-from agentopsworkbench.store import SEED, CustomerStore
+from agentopsworkbench.store import SEED, CustomerStore, load_store
 
 ROOT = Path(__file__).resolve().parent
+STORE = load_store()
 
 CUSTOMERS = [(f"{cid} - {rec['name']}", cid) for cid, rec in SEED.items()]
+
+
+def store_view():
+    return json.dumps(STORE.snapshot(), indent=2)
+
+
+def reset_store():
+    STORE.reset()
+    return store_view()
 
 
 def format_trace(result):
@@ -47,17 +59,17 @@ def run_task(task, customer_id, new_email, new_address, approve):
     inputs = {"customer_id": customer_id}
     if task == "update_customer_email":
         if not new_email.strip():
-            return "needs input", "Enter a new email first.", ""
+            return "needs input", "Enter a new email first.", "", store_view()
         inputs["new_email"] = new_email.strip()
     if task == "update_customer_address":
         if not new_address.strip():
-            return "needs input", "Enter a new address first.", ""
+            return "needs input", "Enter a new address first.", "", store_view()
         inputs["new_address"] = new_address.strip()
     try:
         steps, allow_list, verify_spec = build_plan(task, inputs)
     except ValueError as exc:
-        return "error", str(exc), ""
-    store = CustomerStore()
+        return "error", str(exc), "", store_view()
+    store = STORE
     before = store.snapshot()
     approver = always_approve if approve else always_deny
     result = run_plan(steps, allow_list, store, approver,
@@ -68,7 +80,7 @@ def run_task(task, customer_id, new_email, new_address, approve):
         store_before=before, store_after=result.store_snapshot))
     record = result.store_snapshot.get(customer_id)
     return (result.status, format_trace(result) + f"\nrun saved: {path}",
-            json.dumps(record, indent=2))
+            json.dumps(record, indent=2), store_view())
 
 
 def run_golden():
@@ -97,14 +109,14 @@ def run_request(request, approve, model_id):
     plan_text = json.dumps(
         {"task": proposal.task, **proposal.inputs}, indent=2
     ) if proposal.ok else f"no plan: {proposal.error}"
-    store = CustomerStore()
+    store = STORE
     before = store.snapshot()
     if not proposal.ok:
         path = save_run(build_record(
             source="ui", brain="llm", model=model_id, request=request,
             refusal_reason=proposal.error, status="refused",
             store_before=before, store_after=before))
-        return "refused", plan_text + f"\nrun saved: {path}", "", ""
+        return "refused", plan_text + f"\nrun saved: {path}", "", "", store_view()
     grounded = grounding_problems(proposal, request, store)
     if grounded:
         path = save_run(build_record(
@@ -115,7 +127,7 @@ def run_request(request, approve, model_id):
         return ("refused",
                 plan_text + "\n\nNot grounded: " + "; ".join(grounded)
                 + f"\nrun saved: {path}",
-                "", "")
+                "", "", store_view())
     steps, allow_list, verify_spec = build_plan(
         proposal.task, proposal.inputs
     )
@@ -130,7 +142,7 @@ def run_request(request, approve, model_id):
     record = result.store_snapshot.get(proposal.inputs["customer_id"])
     return (result.status, plan_text,
             format_trace(result) + f"\nrun saved: {path}",
-            json.dumps(record, indent=2))
+            json.dumps(record, indent=2), store_view())
 
 
 def run_choices():
@@ -171,10 +183,11 @@ def replay_run_ui(run_id):
 with gr.Blocks(title="AgentOps Workbench") as demo:
     gr.Markdown("# AgentOps Workbench: test UI")
     gr.Markdown(
-        "Same guardrailed executor as the CLI. Fake customer store, "
-        "in-memory: every run starts from the seed data again, "
-        "so the store never keeps a change. Run records are saved "
-        "to runs/ and listed in the Runs tab."
+        "Same guardrailed executor as the CLI. The customer store is "
+        "persisted to store.json: an approved update sticks between "
+        "runs. Only a run that passes verification writes it, so a "
+        "refused, denied, or failed run never changes it. Run records "
+        "are saved to runs/ and listed in the Runs tab."
     )
 
     with gr.Tab("Try a task"):
@@ -199,15 +212,20 @@ with gr.Blocks(title="AgentOps Workbench") as demo:
         status = gr.Textbox(label="Run status")
         trace = gr.Textbox(label="Trace log", lines=10)
         record = gr.Textbox(label="Customer record after the run", lines=8)
+        store_box = gr.Textbox(label="Current customers (persisted)",
+                               lines=10, value=store_view())
+        reset_btn = gr.Button("Reset store to seed data")
         run_btn.click(
             run_task,
             inputs=[task, customer, new_email, new_address, approve],
-            outputs=[status, trace, record],
+            outputs=[status, trace, record, store_box],
         )
+        reset_btn.click(reset_store, outputs=store_box)
         gr.Markdown(
             "Try it twice: once with approval on, once with it off. "
-            "Approved, the record changes and the read-back check passes. "
-            "Denied, the run ends cleanly and the record stays as it was."
+            "Approved, the record changes and the read-back check passes, "
+            "and the change stays in the store. Denied, the run ends "
+            "cleanly and the record stays as it was."
         )
 
     with gr.Tab("Golden scenarios"):
@@ -244,10 +262,13 @@ with gr.Blocks(title="AgentOps Workbench") as demo:
         trace_llm = gr.Textbox(label="Trace log", lines=10)
         record_llm = gr.Textbox(label="Customer record after the run",
                                 lines=8)
+        store_box_llm = gr.Textbox(label="Current customers (persisted)",
+                                   lines=10, value=store_view())
         ask_btn.click(
             run_request,
             inputs=[request, approve_llm, model_id],
-            outputs=[status_llm, plan_llm, trace_llm, record_llm],
+            outputs=[status_llm, plan_llm, trace_llm, record_llm,
+                     store_box_llm],
         )
 
     with gr.Tab("Runs"):
