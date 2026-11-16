@@ -166,7 +166,11 @@ def render_sankey_svg(data, width=760, height=360):
     node_w = 16
     gap = 14
     pad = 8
-    step = ((width - 2 * pad - node_w) / max_depth) if max_depth else 0
+    label_room = 200  # room for the longest tool label between columns
+    last_label_room = 170  # room for the last column's label
+    step = max((width - 2 * pad - node_w) / max_depth if max_depth else 0,
+               node_w + label_room)
+    svg_width = int(2 * pad + max_depth * step + node_w + last_label_room)
     columns = {}
     for i, n in enumerate(nodes):
         columns.setdefault(n["depth"], []).append(i)
@@ -199,7 +203,7 @@ def render_sankey_svg(data, width=760, height=360):
         link["y0"] = sy + so
         link["y1"] = ty + ti
         link["h"] = v * scale
-    parts = [f'<svg width="{width}" height="{height}" '
+    parts = [f'<svg width="{svg_width}" height="{height}" '
              f'xmlns="http://www.w3.org/2000/svg" '
              f'font-family="sans-serif" font-size="12">']
     for link in links:
@@ -222,16 +226,13 @@ def render_sankey_svg(data, width=760, height=360):
             f'fill="{color}" rx="2" />'
         )
         label = f"{n['label']} ({n['value']})"
-        if n["depth"] == max_depth:
-            parts.append(
-                f'<text x="{x - 6}" y="{y + h / 2 + 4}" '
-                f'text-anchor="end" fill="#333">{label}</text>'
-            )
-        else:
-            parts.append(
-                f'<text x="{x + node_w + 6}" y="{y + h / 2 + 4}" '
-                f'fill="#333">{label}</text>'
-            )
+        # Every label goes to the right of its bar. The old code drew
+        # the last column's label to the left, and it collided with
+        # the previous column's label.
+        parts.append(
+            f'<text x="{x + node_w + 6}" y="{y + h / 2 + 4}" '
+            f'fill="#333">{label}</text>'
+        )
     parts.append("</svg>")
     return "".join(parts)
 

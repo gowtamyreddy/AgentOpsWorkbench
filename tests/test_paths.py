@@ -2,6 +2,7 @@ from agentopsworkbench.paths import (
     changed_fields, execution_path, extra_fields, group_runs,
     render_sankey_svg, sankey_data,
 )
+import re
 
 
 def make_record(status="succeeded", tools=("get_customer",
@@ -145,3 +146,21 @@ def test_render_sankey_svg_has_nodes_and_links():
 
 def test_render_sankey_svg_empty_runs():
     assert "No saved runs" in render_sankey_svg({"nodes": [], "links": []})
+
+
+def test_render_sankey_svg_labels_do_not_overlap():
+    """Regression: the last column's label used to be drawn left of
+    its bar, straight into the previous column's label."""
+    records = [make_record(status="succeeded") for _ in range(6)]
+    records.append(make_record(status="denied", tools=("get_customer",)))
+    svg = render_sankey_svg(sankey_data(records))
+    assert 'text-anchor="end"' not in svg
+    labels = []
+    for m in re.finditer(r'<text x="([\d.]+)" y="([\d.]+)"[^>]*>'
+                         r'([^<]+)</text>', svg):
+        x, y, text = float(m.group(1)), float(m.group(2)), m.group(3)
+        labels.append((x, y, x + 7 * len(text), text))
+    for i, (x0, y0, x1, t0) in enumerate(labels):
+        for x2, y2, x3, t1 in labels[i + 1:]:
+            if abs(y0 - y2) < 12:
+                assert x1 <= x2 or x3 <= x0, f"{t0!r} overlaps {t1!r}"
