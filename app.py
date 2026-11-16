@@ -22,9 +22,12 @@ from agentopsworkbench.brain import LLMBrain, MODEL_ID
 from agentopsworkbench.executor import run_plan
 from agentopsworkbench.grounding import grounding_problems
 from agentopsworkbench.policy import TASKS, build_plan
+from agentopsworkbench.paths import (
+    group_runs, render_sankey_svg, sankey_data,
+)
 from agentopsworkbench.replay import replay_record
 from agentopsworkbench.trace_store import (
-    build_record, list_run_summaries, load_run, save_run,
+    build_record, list_run_summaries, list_runs, load_run, save_run,
 )
 from agentopsworkbench.store import SEED, CustomerStore, load_store
 
@@ -145,6 +148,19 @@ def run_request(request, approve, model_id):
             json.dumps(record, indent=2), store_view())
 
 
+def paths_view():
+    """Sankey diagram plus the path table, from the saved runs."""
+    records = [json.loads(p.read_text()) for p in list_runs()]
+    groups = group_runs(records)
+    rows = [
+        [" -> ".join(g["path"]) or "(no tool calls)", g["count"],
+         ", ".join(f"{k}: {v}" for k, v in g["outcomes"].items()),
+         g["extra_runs"]]
+        for g in groups
+    ]
+    return render_sankey_svg(sankey_data(records)), rows
+
+
 def run_choices():
     return [(f"{s['timestamp']} | {s['status']} | {s['task']}",
              s["run_id"]) for s in list_run_summaries()]
@@ -187,7 +203,8 @@ with gr.Blocks(title="AgentOps Workbench") as demo:
         "persisted to store.json: an approved update sticks between "
         "runs. Only a run that passes verification writes it, so a "
         "refused, denied, or failed run never changes it. Run records "
-        "are saved to runs/ and listed in the Runs tab."
+        "are saved to runs/, listed in the Runs tab, and grouped by "
+        "execution path in the Paths tab."
     )
 
     with gr.Tab("Try a task"):
@@ -289,6 +306,22 @@ with gr.Blocks(title="AgentOps Workbench") as demo:
                        outputs=run_detail)
         replay_btn.click(replay_run_ui, inputs=run_picker,
                          outputs=replay_out)
+
+    with gr.Tab("Paths"):
+        gr.Markdown(
+            "Every saved run grouped by its tool-call path. The thin "
+            "branch is where runs touch a field the request never "
+            "asked for; the table counts those runs per path."
+        )
+        sankey, path_rows = paths_view()
+        paths_btn = gr.Button("Refresh", variant="primary")
+        sankey_box = gr.HTML(value=sankey)
+        path_table = gr.Dataframe(
+            headers=["Path", "Runs", "Outcomes",
+                     "Runs with extra field changes"],
+            value=path_rows, label="Paths",
+        )
+        paths_btn.click(paths_view, outputs=[sankey_box, path_table])
 
 
 if __name__ == "__main__":

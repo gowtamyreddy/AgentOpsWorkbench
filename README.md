@@ -164,6 +164,19 @@ adversarial set, and replays still use an in-memory store, so
 they stay isolated and deterministic. Full write-up:
 `docs/persistent_store_2026-11-14.md`.
 
+## Execution paths and the Sankey view
+
+A fifth tab, Paths, groups the saved runs by their tool-call
+path and draws the flows as a Sankey diagram: start, then each
+tool in order, then the outcome, with widths by run count. Beside
+it, a table lists each path with its run count, its outcomes,
+and how many of its runs changed a field the request never asked
+for. That last number is the point: the runs that touch an extra
+field tend to take a different path, and the thin branch stands
+out. The field check itself is a diff of the store before and
+after each run, compared against the fields in the request
+inputs. Full write-up: `docs/paths_2026-11-16.md`.
+
 ## Proof: the golden set
 
 10 scenarios in `data/golden_scenarios.jsonl`, run with:
